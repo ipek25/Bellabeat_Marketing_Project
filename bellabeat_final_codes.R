@@ -1,51 +1,75 @@
 Sys.setlocale("LC_TIME", "English")
+
 library(tidyverse)
 library(lubridate)
+
 # Importing the dataset
+
 setwd("~/R_documents/Fitabase Data 4.12.16-5.12.16")
 dailyactivity <- read.csv("dailyActivity_merged.csv")
 sleep <- read.csv("sleepDay_merged.csv")
 hourlysteps <- read.csv("hourlySteps_merged.csv")
+
                 #Data Cleaning
 #Dates are registered as strings. Changing data type to date and time
+
 dailyactivity$ActivityDate<-as.Date(dailyactivity$ActivityDate, "%m/%d/%Y")
 sleep$SleepDay<-as.Date(sleep$SleepDay, "%m/%d/%Y")
 hourlysteps$ActivityHour <- 
   parse_date_time(hourlysteps$ActivityHour, "%m/%d/%Y %H:%M:%S %p")
+
 #Removing duplicates (only sleep data have 3 duplicates)
+
 dailyactivity_new <- distinct(dailyactivity)
 sleep_new <- distinct(sleep)
 hourlysteps_new <- distinct(hourlysteps)
+
                 #Data manipulation
 #Separating date and time
+
 hourlysteps_new <-
   separate(hourlysteps_new, ActivityHour, c('activity_date', 'activity_hour'), " ")
+
 #After separation date and time columns become string. To convert that
+
 hourlysteps_new$activity_date<-as.Date(hourlysteps_new$activity_date, "%Y-%m-%d")
+
 #Finding corresponding weekdays for dates
+
 dailyactivity_new <- 
   mutate(dailyactivity_new, days=weekdays(dailyactivity_new$ActivityDate))
+
 #Joining daily activity data with sleep data
+
 sleep_new <- rename(sleep_new, ActivityDate=SleepDay)
 fullJoinDf <- full_join(dailyactivity_new,sleep_new,by=c("Id", "ActivityDate"))
+
                 #Analyse
         #Daily activity by intensity (in percentages)
 #Finding people' who did not wear their devices's Total Distance=0
+
 no_activity <- dailyactivity_new %>% 
   filter(TotalDistance == 0) 
 count(no_activity)
+
 #Finding out their frequency of not wearing these devices
+
 no_activity %>% 
   group_by(Id) %>%  
   tally() %>%  
   arrange(-n)
+
 #Deleting data where Total Distance =0
+
 dailyactivity_new <- dailyactivity_new %>%
   filter(TotalDistance != 0)
+
 #Evaluating respondent's daily performance
+
 dailyactivity_new <- mutate(dailyactivity_new, totalminutes=SedentaryMinutes+LightlyActiveMinutes+
                               FairlyActiveMinutes+VeryActiveMinutes)
 #Finding percentages
+
 minutes <- data.frame(
   id = dailyactivity_new$Id,
   date= dailyactivity_new$ActivityDate,
@@ -53,7 +77,9 @@ minutes <- data.frame(
   light= dailyactivity_new$LightlyActiveMinutes/dailyactivity_new$totalminutes*100,
   fair= dailyactivity_new$FairlyActiveMinutes/dailyactivity_new$totalminutes*100,
   very= dailyactivity_new$VeryActiveMinutes/dailyactivity_new$totalminutes*100) 
+
 #Finding average percentages
+
 df2 <- data.frame(Percentage=c(mean(minutes$sedentary),
                                mean(minutes$light),
                                mean(minutes$fair),
@@ -62,6 +88,7 @@ df2 <- data.frame(Percentage=c(mean(minutes$sedentary),
                                          "Lightly Active",
                                          "Fairly Active",
                                          "Very Active"))
+
 ggplot(data=df2) +
   geom_bar(mapping = aes(x=Percentage, y=Activity_Intensity, 
                          fill=Activity_Intensity), stat = "identity", width=0.5)+
@@ -70,6 +97,7 @@ ggplot(data=df2) +
       
             #Daily activity by Hour (in Total Steps)
 #deleting 0 steps
+
 no_activity_hourly <- hourlysteps_new %>% 
   select("Id", "activity_date", "StepTotal") %>% 
   group_by(Id, activity_date) %>% 
@@ -95,6 +123,7 @@ hourlysteps_new %>%
        title = "Respondents Average Steps in a Day by Hours")
 
       #Average Total Steps by days of week
+
 dailyactivity_new %>% 
   arrange(days) %>% 
   group_by(days) %>% 
@@ -103,6 +132,7 @@ dailyactivity_new %>%
   geom_col(mapping = aes(x= reorder(days, +mean_steps), y=mean_steps), 
            fill="tomato") +
   labs(x= "Days", y="Average Steps", title="Respondents Average Steps in a Week")
+
       #Relationship between times in bed without sleep and calories
 fullJoinDf %>% 
   drop_na() %>% 
@@ -110,7 +140,9 @@ fullJoinDf %>%
   ggplot(aes(x=Calories, y=nosleep)) +
   geom_point() +
   geom_smooth(color = "purple")
+
 #Getting rid of outliers
+
 fullJoinDf %>% 
   drop_na() %>% 
   mutate(nosleep=TotalTimeInBed - TotalMinutesAsleep) %>% 
